@@ -1,0 +1,7 @@
+variables:
+  resourceGroup: "prodResourceGroup"
+  location: "eastus"
+  aksCluster: "prodAKSCluster"
+  acrName: "prodacrregistry"
+  imageName: "training-environment"
+  imageTag: "latest"

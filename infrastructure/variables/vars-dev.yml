@@ -1,0 +1,7 @@
+variables:
+  resourceGroup: "devResourceGroup"
+  location: "eastus"
+  aksCluster: "devAKSCluster"
+  acrName: "devacrregistry"
+  imageName: "training-environment"
+  imageTag: "latest"

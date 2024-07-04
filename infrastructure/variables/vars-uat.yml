@@ -1,0 +1,7 @@
+variables:
+  resourceGroup: "uatResourceGroup"
+  location: "eastus"
+  aksCluster: "uatAKSCluster"
+  acrName: "uatacrregistry"
+  imageName: "training-environment"
+  imageTag: "latest"

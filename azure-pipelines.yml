@@ -1,0 +1,88 @@
+trigger:
+- main
+
+parameters:
+- name: environments
+  type: object
+  default:
+    - name: dev
+      subscriptionConnection: "dev-service-connection"
+    - name: sit
+      subscriptionConnection: "sit-service-connection"
+    - name: uat
+      subscriptionConnection: "uat-service-connection"
+    - name: prod
+      subscriptionConnection: "prod-service-connection"
+
+pool:
+  vmImage: "ubuntu-latest"
+
+variables:
+  terraformVersion: "1.0.0"
+
+stages:
+- ${{ each env in parameters.environments }}:
+  - stage: DeployInfrastructureTo${{ env.name }}
+    displayName: Deploy Infrastructure to ${{ env.name }} Environment
+    variables:
+      - template: infrastructure/variables/vars-${{ env.name }}.yml
+    jobs:
+    - job: DeploymentPrerequisites
+      steps:
+      - task: AzureCLI@2
+        inputs:
+          azureSubscription: ${{ env.subscriptionConnection }}
+          scriptType: "bash"
+          scriptLocation: "inlineScript"
+          inlineScript: |
+            az group create --name $(resourceGroup) --location $(location)
+            az storage account create --name terraformbackend --resource-group $(resourceGroup) --location $(location) --sku Standard_LRS
+            az storage container create --name tfstate --account-name terraformbackend
+
+    - job: InfrastructureDeployment
+      dependsOn: DeploymentPrerequisites
+      steps:
+      - task: InstallTerraformInstaller@0
+        inputs:
+          terraformVersion: $(terraformVersion)
+
+      - script: terraform init -backend-config="resource_group_name=$(resourceGroup)" -backend-config="storage_account_name=terraformbackend" -backend-config="container_name=tfstate" -backend-config="key=terraform.tfstate"
+        displayName: "Terraform Init"
+
+      - script: terraform plan -out=plan.tfplan -var-file=infrastructure/base_deployment/tfvars/${{ env.name }}.tfvars
+        displayName: "Terraform Plan"
+
+      - script: terraform apply -input=false plan.tfplan
+        displayName: "Terraform Apply"
+
+- stage: BuildAndPushDockerImage
+  dependsOn: [${{ parameters.environments.name }}]
+  jobs:
+  - job: BuildAndPushDockerImage
+    steps:
+    - task: Docker@2
+      inputs:
+        containerRegistry: ${{ env.subscriptionConnection }}
+        repository: "$(acrName)/$(imageName)"
+        command: "buildAndPush"
+        Dockerfile: "**/Dockerfile"
+        tags: |
+          $(imageTag)
+
+- stage: Deploy
+  dependsOn: BuildAndPushDockerImage
+  jobs:
+  - job: Deploy
+    steps:
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: ${{ env.subscriptionConnection }}
+        scriptType: "bash"
+        scriptLocation: "inlineScript"
+        inlineScript: |
+          az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster)
+          helm repo add beryju https://charts.beryju.org
+          helm repo update
+          helm install guacamole beryju/guacamole --set guacamole.server.image.tag=1.2.0
+          kubectl apply -f k8s/windows-vm-deployment.yaml
+          kubectl apply -f k8s/windows-vm-service.yaml

@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: windows-vm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: windows-vm
+  template:
+    metadata:
+      labels:
+        app: windows-vm
+    spec:
+      nodeSelector:
+        "kubernetes.io/os": windows
+      containers:
+      - name: windows-vm
+        image: <your-windows-container-image>
+        ports:
+        - containerPort: 3389

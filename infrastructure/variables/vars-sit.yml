@@ -1,0 +1,7 @@
+variables:
+  resourceGroup: "sitResourceGroup"
+  location: "eastus"
+  aksCluster: "sitAKSCluster"
+  acrName: "sitacrregistry"
+  imageName: "training-environment"
+  imageTag: "latest"
